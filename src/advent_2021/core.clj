@@ -1,7 +1,10 @@
 (ns advent-2021.core
-  (:gen-class))
+  (:require [clojure.string :as string]))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
+(defn split-on-whitespace [s]
+  (string/split s #"\s+"))
+
+(defn T
+  "Transpose"
+  [xs]
+  (apply map vector xs))

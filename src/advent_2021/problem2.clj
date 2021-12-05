@@ -1,54 +1,44 @@
 (ns advent-2021.problem2
   (:require [clojure.string :as string]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [advent-2021.core :as aoc]))
 
-(def inputs
-  (slurp (io/resource "aoc-2.txt")))
-
-
-(defn ->command
-  [s]
-  (let [[direction n] (string/split s #" ")]
-    [direction (Integer/parseInt n)]))
+(defn ->numeric-magnitude [[direction magnitude]]
+  [direction (Integer/parseInt magnitude)])
 
 (def commands
-  (->> (string/split inputs #"\n")
-    (map ->command)))
+  (->> "aoc-2.txt"
+    io/resource
+    slurp
+    string/split-lines            ;; "forward 1\ndown 1"            -> ["forward 1" "down 1"]
+    (map aoc/split-on-whitespace) ;; ["forward 1" "down 1"]         -> [["forward" "1"] ["down" "1"]]
+    (map ->numeric-magnitude)     ;; [["forward" "1"] ["down" "1"]] -> [["forward" 1] ["down" 1]]
+    ))
 
-;; Part 1
-(defn interpret-command
-  [current-position [command n]]
-  (case command
-    "forward" (update current-position "horizontal" + n)
-    "down"    (update current-position "depth" + n)
-    "up"      (update current-position "depth" - n)))
+(defn score
+  [{:strs [depth horizontal]}]
+  (* horizontal depth))
 
-(def command-total
-  (reduce interpret-command
+(->> commands
+  (reduce (fn [current-position [direction magnitude]]
+            (case direction
+              "forward" (update current-position "horizontal" + magnitude)
+              "down"    (update current-position "depth" + magnitude)
+              "up"      (update current-position "depth" - magnitude)))
     {"depth"      0
-     "horizontal" 0}
-    commands))
-
-(* (get command-total "horizontal")
-  (get command-total "depth"));; => 1694130
-
+     "horizontal" 0})
+  score);; => 1694130
 
 ;; Part 2
-(defn interpret-command-2
-  [current-position [command n]]
-  (case command
-    "forward" (-> current-position
-                (update "horizontal" + n)
-                (update "depth" + (* (get current-position "aim") n)))
-    "down"    (update current-position "aim" + n)
-    "up"      (update current-position "aim" - n)))
-
-(def command-total-2
-  (reduce interpret-command-2
+(->> commands
+  (reduce (fn [current-position [direction magnitude]]
+            (case direction
+              "forward" (-> current-position
+                          (update "horizontal" + magnitude)
+                          (update "depth" + (* (get current-position "aim") magnitude)))
+              "down"    (update current-position "aim" + magnitude)
+              "up"      (update current-position "aim" - magnitude)))
     {"depth"      0
      "horizontal" 0
-     "aim"        0}
-    commands))
-
-(* (get command-total-2 "horizontal")
-  (get command-total-2 "depth"));; => 1698850445
+     "aim"        0})
+  score);; => 1698850445

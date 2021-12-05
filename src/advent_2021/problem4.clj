@@ -2,7 +2,8 @@
   (:require [clojure.string :as string]
             [clojure.set :as set]
             [clojure.java.io :as io]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all]
+            [advent-2021.core :as aoc]))
 
 ;; Basic parsing
 (defn row->ints
@@ -17,7 +18,7 @@
 ;; Once we have the board, we can create a set of predicate functions such that,
 ;; if any of them evaluate to true, indicate that a given board wins
 
-(defn ->win-predicate
+(defn ->win-condition
   "Create a predicate function that takes a set of all called numbers and
   determines if the board won or not by checking if all the required numbers
   were called."
@@ -26,52 +27,47 @@
     (= (count required-numbers)
       (count (clojure.set/intersection required-numbers called-numbers)))))
 
-(defn T
-  "Matrix transpose"
-  [matrix]
-  (apply map vector matrix))
+(defn row-win-conditions [board]
+  (map (comp ->win-condition set) board))
 
-(defn all-rows-and-columns
-  [board]
-  (concat board (T board)))
+(defn column-win-conditions [board]
+  (map (comp ->win-condition set) (aoc/T board)))
 
-(defn generate-winning-predicates
-  "Generate a collection of functions that represent all the ways a board can win.
+(defn all-ways-to-win
+  "Generate a function that represent all the ways a board can win.
   For a given board, getting all entries in a row or column will win"
   [board]
-  (->> board
-    (all-rows-and-columns)
-    (map (comp ->win-predicate set))
-    (vec)))
+  (->> [row-win-conditions
+        column-win-conditions]
+    (mapcat (fn [win-condition-generator]
+              (win-condition-generator board)))
+    (apply some-fn)))
 
-(defn win?
-  "Check if a board wins by checking if any of the possible winning conditions
-  (predicates) are fulfilled"
-  [called-numbers {:keys [winning-conditions] :as board}]
-  (some identity ((apply juxt winning-conditions) called-numbers)))
-
+(defn board-wins?
+  [called-numbers {:keys [win?] :as board}]
+  (win? (set called-numbers)))
 
 ;; Scoring
-(defn uncalled-bingo-squares
-  [all-bingo-squares called-numbers]
-  (apply disj (set all-bingo-squares) called-numbers))
+(defn uncalled-squares
+  [{:keys [raw-numbers] :as board} called-numbers]
+  (apply disj (set raw-numbers) called-numbers))
 
 (defn append-score
-  [called-numbers {:keys [raw-numbers] :as board}]
-  (assoc board :score (* (apply + (uncalled-bingo-squares (set raw-numbers) called-numbers))
+  [called-numbers board]
+  (assoc board :score (* (apply + (uncalled-squares board called-numbers))
                         (last called-numbers))))
 
-(defn score-boards
-  ([n all-called-numbers boards]
-   (score-boards n all-called-numbers boards []))
+(defn score-all-boards
+  ([all-called-numbers boards]
+   (score-all-boards 1 all-called-numbers boards []))
   ([n all-called-numbers boards already-won]
    (if (zero? (count boards))
      already-won
      (let [called-numbers (take n all-called-numbers)
            winners        (->> boards
-                            (filter (partial win? (set called-numbers)))
+                            (filter (partial board-wins? called-numbers))
                             (map (partial append-score called-numbers)))
-           losers         (remove (partial win? (set called-numbers)) boards)]
+           losers         (remove (partial board-wins? called-numbers) boards)]
        (recur (inc n) all-called-numbers losers (concat already-won winners))))))
 
 
@@ -84,9 +80,9 @@
                                   (remove string/blank?)
                                   (map row->ints)
                                   (partition 5))]
-                      {:winning-conditions (generate-winning-predicates board)
-                       :raw-numbers        (sort (flatten board))
-                       :board              board})}))
+                      {:win?        (all-ways-to-win board)
+                       :raw-numbers (sort (flatten board))
+                       :board       board})}))
 
 (def parsed-inputs
   (-> "aoc-4.txt"
@@ -97,5 +93,5 @@
 (def bingo-numbers (:bingo-numbers parsed-inputs))
 (def bingo-boards  (:bingo-boards parsed-inputs))
 
-(:score (first (score-boards 1 bingo-numbers bingo-boards)));; => 11536
-(:score (last (score-boards 1 bingo-numbers bingo-boards)));; => 1284
+(:score (first (score-all-boards bingo-numbers bingo-boards)));; => 11536
+(:score (last (score-all-boards bingo-numbers bingo-boards)));; => 1284
