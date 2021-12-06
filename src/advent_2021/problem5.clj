@@ -51,12 +51,12 @@
     {:x dx' :y dy'}))
 
 (defn points-on-line
-  [[p1 p2 :as line]]
-  (let [unit (unit-vector line)]
-    (loop [points (list p1)]
-      (if (= p2 (first points))
-        (reverse points)
-        (recur (conj points (merge-with + (first points) unit)))))))
+  [[start end :as line]]
+  (let [step (unit-vector line)]
+    (loop [[last-point :as points] (list start)]
+      (if (= end last-point)
+        points
+        (recur (conj points (merge-with + last-point step)))))))
 
 (def result
   (->> lines

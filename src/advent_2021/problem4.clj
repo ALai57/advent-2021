@@ -37,10 +37,9 @@
   "Generate a function that represent all the ways a board can win.
   For a given board, getting all entries in a row or column will win"
   [board]
-  (->> [row-win-conditions
-        column-win-conditions]
-    (mapcat (fn [win-condition-generator]
-              (win-condition-generator board)))
+  (->> board
+    ((juxt row-win-conditions column-win-conditions))
+    (flatten)
     (apply some-fn)))
 
 (defn board-wins?
