@@ -4,7 +4,7 @@
             [clojure.string :as string]))
 
 
-(def input
+(def example-input
   "be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe
 edbfga begcd cbg gc gcadebf fbgde acbgfd abcde gfcbed gfec | fcgedb cgb dgebacf gc
 fgaebd cg bdaec gdafb agbcfd gdcbef bgcad gfac gcb cdgabef | cg cg fdcagb cbg
@@ -16,19 +16,24 @@ bdfegc cbegaf gecbf dfcage bdacg ed bedf ced adcbefg gebcd | ed bcgafe cdgba cbg
 egadfb cdbfeg cegd fecab cgb gbdefca cg fgcdab egfdb bfceg | gbdfcae bgc cg cgb
 gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce")
 
+(def raw-input
+  (string/trim (slurp (io/resource "aoc-8.txt"))))
+
+;; Helpers
 (defn split-on-whitespace
   [s]
   (string/split s #" "))
 
 (defn parse-tokens
   [v]
-  (let [output (rest (drop-while (partial not= "|") v))]
-    {:signal-pattern (take-while (partial not= "|") v)
-     :digital-output output
-     :output-set     (map set output)}))
+  (let [scrambled-output (rest (drop-while (partial not= "|") v))
+        scrambled-inputs (take-while (partial not= "|") v)]
+    {:signal-pattern (map set scrambled-inputs)
+     :digital-output (map set scrambled-output)}))
 
-(def processed-input
-  (->> (string/split input #"\n")
+(defn ingest
+  [input-string]
+  (->> (string/split input-string #"\n")
        (map (comp parse-tokens split-on-whitespace))))
 
 (defn classify
@@ -40,49 +45,33 @@ gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce
     (= 7 (count s)) 8))
 
 (defn count-numbers
-  [processed-inputs]
-  (->> processed-inputs
+  [input-string]
+  (->> input-string
+       ingest
        (mapcat (comp (partial map classify) :digital-output))
        (filter identity)
        count))
 
-(count-numbers processed-input);; => 26
-
-;; REAL DATA
-(def raw-input
-  (string/trim (slurp (io/resource "aoc-8.txt"))))
-
-(def parsed-input
-  (->> (string/split raw-input #"\n")
-       (map (comp parse-tokens split-on-whitespace))))
-
-(count-numbers parsed-input);; => 278
+(count-numbers example-input);; => 26
+(count-numbers raw-input);; => 278
 
 ;; Part 2
 ;;
-(defn nine?
-  [state s]
-  (let [[four seven] (map (partial get state) [4 7])]
-    (and four seven
-         (= 6 (count s))
-         (= 5 (count (set/intersection (set/union four seven)
-                                       (set s)))))))
-
 (defn zero?'
   [state s]
   (let [[one nine] (map (partial get state) [1 9])]
     (and one nine
          (= 6 (count s))
-         (= 2 (count (set/intersection one (set s)))))))
+         (= 2 (count (set/intersection one s))))))
 
 (defn one?'
   [state s]
   (= 2 (count s)))
 
-(defn six?
+(defn two?
   [state s]
-  (let [zero (get state 0)]
-    (and zero (= 6 (count s)))))
+  (let [[five three] (map (partial get state) [5 3])]
+    (and five three (= 5 (count s)))))
 
 (defn three?
   [state s]
@@ -90,8 +79,8 @@ gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce
     (and nine
          (= 5
             (count s)
-            (count (set/intersection nine (set s))))
-         (= 2 (count (set/intersection one (set s)))))))
+            (count (set/intersection nine s)))
+         (= 2 (count (set/intersection one s))))))
 
 (defn four?
   [state s]
@@ -103,12 +92,12 @@ gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce
     (and six
          (= 5
             (count s)
-            (count (set/intersection six (set s)))))))
+            (count (set/intersection six s))))))
 
-(defn two?
+(defn six?
   [state s]
-  (let [[five three] (map (partial get state) [5 3])]
-    (and five three (= 5 (count s)))))
+  (let [zero (get state 0)]
+    (and zero (= 6 (count s)))))
 
 (defn seven?
   [state s]
@@ -117,6 +106,14 @@ gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce
 (defn eight?
   [state s]
   (= 7 (count s)))
+
+(defn nine?
+  [state s]
+  (let [[four seven] (map (partial get state) [4 7])]
+    (and four seven
+         (= 6 (count s))
+         (= 5 (count (set/intersection (set/union four seven) s))))))
+
 
 (defn classify-2
   [state s]
@@ -136,31 +133,34 @@ gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce
   [segment-seq]
   (loop [[current & more] segment-seq
          state            {}]
-    ;; (println current more state)
-    ;; (Thread/sleep 100)
+    ;;(println current more state)
+    ;;(Thread/sleep 100)
     (let [n (classify-2 state current)]
       (cond
         (nil? current) state
         (nil? n)       (recur (concat more [current]) state)
-        :else          (recur more (assoc state n (set current)))))
+        :else          (recur more (assoc state n current))))
     ))
 
+(defn solve-single
+  [{:keys [signal-pattern digital-output] :as x}]
+  (let [mapping (set/map-invert (derive-numbers signal-pattern))
+        decoded (map (partial get mapping) digital-output)]
+    (assoc x
+           :decoded decoded
+           :value   (Integer/parseInt (apply str decoded)))))
+
 (defn solve
-  [inputs]
-  (for [{:keys [signal-pattern output-set] :as x} inputs]
-    (let [mapping  (derive-numbers signal-pattern)
-          mapping' (set/map-invert mapping)
-          decoded  (map (partial get mapping') output-set)]
-      (assoc x
-             :mapping mapping
-             :decoded (map (partial get mapping') output-set)
-             :value   (Integer/parseInt (apply str decoded))))))
+  [input-string]
+  (->> input-string
+       ingest
+       (map solve-single)))
 
 (reduce +
         0
-        (map :value (solve processed-input)));; => 61229
+        (map :value (solve example-input)));; => 61229
 
 
 (reduce +
         0
-        (map :value (solve parsed-input)));; => 986179
+        (map :value (solve raw-input)));; => 986179
