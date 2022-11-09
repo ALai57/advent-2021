@@ -1,0 +1,8 @@
+Naming/UncommunicativeMethodParamName:
+  AllowedNames:
+    - x
+    - y
+    - z
+    - u
+    - v
+    - uv
